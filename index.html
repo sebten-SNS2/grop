@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الحضور والغياب</title>
+<link rel="stylesheet" href="css.css">
+</head>
+<body>
+  <!-- إضافة الشعار أعلى الصفحة -->
+  <div class="topLogo">
+    <img id="headerLogo" src="ص.png" alt="شعار الفريق الوطني">
+    <div class="logoText">
+      <div>رئاسة مجلس الوزراء</div>
+      <div>المجلس الاعلى للشباب</div>
+      <div>الفريق الوطني للشباب الرقمي</div>
+      <div>دائرة النجف الاشرف</div>
+    </div>
+  </div>
+
+  <h1>سجل الحضور والغياب</h1>
+
+  <header>
+    <input id="search" placeholder="بحث بالاسم…" />
+    <select id="filter">
+      <option value="all">الكل</option>
+      <option value="present">الحضور فقط</option>
+      <option value="absent">الغياب فقط</option>
+      <option value="unset">بدون تحديد</option>
+    </select>
+    <button type="button" id="markAllPresent">تحديد الجميع حضور</button>
+    <button type="button" id="markAllAbsent" class="danger">تحديد الجميع غياب</button>
+    <button type="button" id="clearMarks">مسح التحديد</button>
+  </header>
+
+  <div class="toolbar">
+    <button type="button" id="save" class="primary">حفظ في المتصفح</button>
+    <button type="button" id="load">استرجاع الحفظ</button>
+    <!-- زر واحد فقط -->
+    <button type="button" id="exportXls" class="primary">تصدير Excel ملوّن</button>
+    <button type="button" id="clearAllNames" class="danger">مسح كل الأسماء</button>
+  </div>
+
+  <div class="stats" id="stats">الحضور: 0 | الغياب: 0 | غير محدد: 0</div>
+
+  <div id="list" class="list" aria-live="polite" role="list"></div>
+
+  <details>
+    <summary>إدارة القائمة</summary>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <textarea id="namesInput" rows="4" style="flex:1;min-width:260px"
+        placeholder="أدخل الأسماء، كل اسم في سطر"></textarea>
+      <button type="button" id="replaceNames">استبدال القائمة</button>
+      <button type="button" id="appendNames">إضافة للأسماء</button>
+      <button type="button" id="resetAll" class="danger">إعادة ضبط الكل</button>
+    </div>
+    <div class="muted">تلميح: لصق الأسماء من Excel/Google Sheets (عمود واحد) يعمل مباشرة.</div>
+  </details>
+
+<script>
+const STORAGE_KEY = "attendance_v1";
+let data = [
+[
+  {id:"1", name:"احسان اياد كاظم عزيز", status:null},
+  {id:"2", name:"احمد رائد ناجي عبد", status:null},
+  {id:"3", name:"احمد عادل محمد عبد الحمزة", status:null},
+  {id:"4", name:"اسامه محمد فاهم سلمان", status:null},
+  {id:"5", name:"الحسن فلاح عبد الحسن هاشم", status:null},
+  {id:"6", name:"انور رياض وحيد حسن", status:null},
+  {id:"7", name:"اوس شلال عباس جودي", status:null},
+  {id:"8", name:"إيمان هادي ناجي عبيس", status:null},
+  {id:"9", name:"باقر عباس صبار مشكور", status:null},
+  {id:"10", name:"بنين عارف نعمه خضير", status:null},
+  {id:"11", name:"جعفر طه حسن جاسم", status:null},
+  {id:"12", name:"حسن ابراهيم لفته ماضي", status:null},
+  {id:"13", name:"حسن تكليف حسن عليوي", status:null},
+  {id:"14", name:"حسن عبد الحسين عبد زيد دهام", status:null},
+  {id:"15", name:"حسن وجيه حسن صيهود", status:null},
+  {id:"16", name:"حسين شهيد حميد محمد", status:null},
+  {id:"17", name:"حسين صباح احمد عبدالحسين", status:null},
+  {id:"18", name:"حسين مهدي ماهي ليلو", status:null},
+  {id:"19", name:"حسين نجران فالح محمد", status:null},
+  {id:"20", name:"حوراء علي عبد الامير صالح", status:null},
+  {id:"21", name:"حيدر اثير زهير جواد", status:null},
+  {id:"22", name:"حيدر سجاد كاظم حسين", status:null},
+  {id:"23", name:"ذوالفقار صالح محسن كريم", status:null},
+  {id:"24", name:"زيد طالب صباح عبد السيد", status:null},
+  {id:"25", name:"زيد عبدالرحمن ساجت علي", status:null},
+  {id:"26", name:"طيبة عمار محسن حميد", status:null},
+  {id:"27", name:"زين العابدين سعد عيسى", status:null},
+  {id:"28", name:"زين العابدين فلاح حسن وادي", status:null},
+  {id:"29", name:"سبطين صادق محمد رسول", status:null},
+  {id:"30", name:"شيماء حسن سوادي جبر", status:null},
+  {id:"31", name:"صابرين علي حسوني عبدالله", status:null},
+  {id:"32", name:"ضرغام كريم خادم عبد الواحد", status:null},
+  {id:"33", name:"طه فاضل عبد الله محسن", status:null},
+  {id:"34", name:"عبد الرسول عماد كاظم عاجل", status:null},
+  {id:"35", name:"عبدالكريم قاسم عبدالكريم غني", status:null},
+  {id:"36", name:"عقيل عبد الرضا وساف حمزه", status:null},
+  {id:"37", name:"علي باسم حسين هادي", status:null},
+  {id:"38", name:"علي حسين عبد الله جواد", status:null},
+  {id:"39", name:"علي حسين عبدالله حسين", status:null},
+  {id:"40", name:"علي رضا كاظم عزيز", status:null},
+  {id:"41", name:"علي عمار عبد زيد عيدان", status:null},
+  {id:"42", name:"غفران هادي ناجي عبيس", status:null},
+  {id:"43", name:"فاطمة زيد عبد الامير عبد الكاظم", status:null},
+  {id:"44", name:"ليث رائد عاشور علي", status:null},
+  {id:"45", name:"مجتبى جميل مانع صحن", status:null},
+  {id:"46", name:"محمد باقر حسين سامي عبد الصاحب", status:null},
+  {id:"47", name:"محمد رضا حيدر حسين فرهود", status:null},
+  {id:"48", name:"محمد رضا قاسم هادي", status:null},
+  {id:"49", name:"محمد عباس محمد حسن حسن", status:null},
+  {id:"50", name:"محمد عبد الحميد ناصر عبودي", status:null},
+  {id:"51", name:"محمد فلاح عبد الحسن هاشم", status:null},
+  {id:"52", name:"محمد مكي محمد كريم", status:null},
+  {id:"53", name:"محمد ناهي شدهان حسين", status:null},
+  {id:"54", name:"مروه كريم عبد الهادي عبد علي", status:null},
+  {id:"55", name:"مريم محمد علي سلمان صالح", status:null},
+  {id:"56", name:"مصطفى جميل مانع صحن", status:null},
+  {id:"57", name:"مصطفى خالد محمد علي هادي", status:null},
+  {id:"58", name:"مصطفى وليد حميد رشيد", status:null},
+  {id:"59", name:"مضر فارس مهدي عزيز", status:null},
+  {id:"60", name:"مقتدى عقيل حسن عبد الرضا", status:null},
+  {id:"61", name:"مهدي يوسف علي سلمان", status:null},
+  {id:"62", name:"نجلاء كاظم عبيد عبود", status:null},
+  {id:"63", name:"هاشم علاء غانم صاحب", status:null},
+  {id:"64", name:"يحيى علي عبد مناف حسين", status:null},
+  {id:"65", name:"مرتضى علاء عبد الحسن هاشم", status:null},
+  {id:"66", name:"حسين حيدر رزاق عبد", status:null},
+  {id:"67", name:"اسراء حيدر هاشم حميد", status:null},
+  {id:"68", name:"امير علي فليح حسن", status:null},
+  {id:"69", name:"جعفر محمد عباس عبد", status:null},
+  {id:"70", name:"محمد صادق حيدر حسن", status:null},
+  {id:"71", name:"مهدي علاء عبدالحسين مهير", status:null},
+  {id:"72", name:"علي صاحب مظلوم مزهر", status:null},
+  {id:"73", name:"اسماعيل هاتف عبد الحسين سلطان", status:null},
+  {id:"74", name:"فرقان كاظم عوجه نهير", status:null},
+  {id:"75", name:"محمد صادق علي عبد زوير", status:null},
+  {id:"76", name:"حميد حاكم محي فاظل", status:null},
+  {id:"77", name:"محمد صادق محمد حياوي", status:null},
+  {id:"78", name:"محمد ستار حسن محسن", status:null},
+  {id:"79", name:"مرتضى نجم عبد عطية", status:null}
+]
+];
+
+const el = {
+  list: document.getElementById('list'),
+  stats: document.getElementById('stats'),
+  search: document.getElementById('search'),
+  filter: document.getElementById('filter'),
+  markAllPresent: document.getElementById('markAllPresent'),
+  markAllAbsent: document.getElementById('markAllAbsent'),
+  clearMarks: document.getElementById('clearMarks'),
+  save: document.getElementById('save'),
+  load: document.getElementById('load'),
+  exportXls: document.getElementById('exportXls'),
+  namesInput: document.getElementById('namesInput'),
+  replaceNames: document.getElementById('replaceNames'),
+  appendNames: document.getElementById('appendNames'),
+  resetAll: document.getElementById('resetAll'),
+  clearAllNames: document.getElementById('clearAllNames'),
+};
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function normalizeStr(s){
+  return String(s||'').toLowerCase()
+    .replace(/[أإآ]/g,'ا').replace(/ى/g,'ي')
+    .replace(/[ئ]/g,'ي').replace(/ؤ/g,'و')
+    .replace(/ـ/g,'')
+    .replace(/[\u0610-\u061A\u064B-\u065F\u06D6-\u06ED]/g,'')
+    .replace(/[^ء-ي0-9\s]/g,'').replace(/\s+/g,' ').trim();
+}
+
+function render(){
+  const q = el.search.value.trim();
+  const f = el.filter.value;
+  const tokens = q ? normalizeStr(q).split(' ').filter(Boolean) : [];
+  const phrase = tokens.join(' ');
+
+  const filtered = data.filter(p=>{
+    const byFilter = f==='present'?p.status===true : f==='absent'?p.status===false : f==='unset'?p.status==null : true;
+    if(!byFilter) return false;
+    if(tokens.length===0) return true;
+    const nameNorm = normalizeStr(p.name);
+    const nameTokens = nameNorm.split(' ').filter(Boolean);
+    return tokens.length===1 ? (nameTokens[0]||"").startsWith(tokens[0]) : nameNorm.startsWith(phrase);
+  });
+
+  el.list.innerHTML = "";
+  filtered.forEach(p=>{
+    const row = document.createElement('div'); row.className='row';
+    const name = document.createElement('div'); name.className='name'; name.textContent=p.name;
+    const pill = document.createElement('span');
+    pill.className='pill ' + (p.status===true?'present':p.status===false?'absent':'');
+    pill.textContent = p.status===true?'حضور':p.status===false?'غياب':'غير محدد';
+    const actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px';
+    [["حضور",true],["غياب",false],["مسح",null]].forEach(([t,v])=>{
+      const b=document.createElement('button'); b.textContent=t; b.onclick=()=>{p.status=v;saveTemp();render();}; actions.append(b);
+    });
+    row.append(name,pill,actions); el.list.append(row);
+  });
+
+  el.stats.textContent=`الحضور: ${data.filter(p=>p.status===true).length} | الغياب: ${data.filter(p=>p.status===false).length} | غير محدد: ${data.filter(p=>p.status==null).length}`;
+}
+
+function saveToStorage(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); alert('تم الحفظ ✅'); }
+function loadFromStorage(){ const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return alert('لا يوجد حفظ'); try{data=JSON.parse(raw);render();}catch{} }
+function saveTemp(){ localStorage.setItem(STORAGE_KEY+"_temp", JSON.stringify(data)); }
+function loadTemp(){ const raw=localStorage.getItem(STORAGE_KEY+"_temp"); if(raw) try{data=JSON.parse(raw);}catch{} }
+
+/* === تصدير Excel ملوّن === */
+function exportXls(){
+  const now = new Date();
+  const dateISO = now.toISOString().slice(0,10);
+  const localStamp = now.toLocaleString("ar-IQ");
+  const f = el.filter.value;
+
+  const filtered = data.filter(p =>
+    f==='present' ? p.status===true :
+    f==='absent'  ? p.status===false :
+    f==='unset'   ? p.status==null : true
+  );
+
+  const rows = filtered.map((p,i)=>{
+    const s = p.status===true ? "حضور" : p.status===false ? "غياب" : "غير محدد";
+    const bg = p.status===true ? "#e8f7e8" : p.status===false ? "#fde8e8" : "#eef2f7";
+    return `<tr style="background:${bg}">
+      <td style="text-align:center">${i+1}</td>
+      <td style="direction:rtl;text-align:right;font-weight:700">${p.name}</td>
+      <td style="text-align:center">${s}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `<meta charset="UTF-8">
+  <table dir="rtl" style="border-collapse:collapse;font-family:Tahoma, Arial; font-size:14px">
+    <thead>
+      <tr><th colspan="3" style="text-align:right;padding:6px;background:#f3f4f6;border:1px solid #ddd">
+        تاريخ التصدير: ${localStamp} — التصفية: ${f==='present'?"الحضور فقط":f==='absent'?"الغياب فقط":f==='unset'?"غير محدد فقط":"الكل"}
+      </th></tr>
+      <tr style="background:#e5e7eb">
+        <th style="border:1px solid #ddd;padding:6px">#</th>
+        <th style="border:1px solid #ddd;padding:6px">الاسم الكامل</th>
+        <th style="border:1px solid #ddd;padding:6px">الحالة</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+
+  const filename = `سجل-الحضور-${dateISO}.xls`;
+
+  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.setAttribute("download", filename);
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); },0);
+}
+
+function normalizeNames(text){ return [...new Set(text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean))]; }
+function replaceList(names){ data=names.map(n=>({id:uid(), name:n, status:null})); render(); saveTemp(); }
+function appendList(names){ const existing=new Set(data.map(p=>p.name)); names.forEach(n=>{ if(!existing.has(n)) data.push({id:uid(),name:n,status:null}); }); render(); saveTemp(); }
+function resetAll(){ data.forEach(p=>p.status=null); saveTemp(); render(); }
+function clearAllNames(){ if(!data.length) return; if(!confirm("حذف الكل؟")) return; data=[]; localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(STORAGE_KEY+"_temp"); render(); }
+
+el.search.addEventListener('input',render);
+el.filter.addEventListener('change',render);
+el.markAllPresent.onclick=()=>{data.forEach(p=>p.status=true);saveTemp();render();};
+el.markAllAbsent.onclick=()=>{data.forEach(p=>p.status=false);saveTemp();render();};
+el.clearMarks.onclick=resetAll;
+el.save.onclick=saveToStorage; el.load.onclick=loadFromStorage;
+el.exportXls.onclick=exportXls; el.clearAllNames.onclick=clearAllNames;
+el.replaceNames.onclick=()=>{const n=normalizeNames(el.namesInput.value);if(!n.length)return; if(!confirm("استبدال؟")) return; replaceList(n); el.namesInput.value="";};
+el.appendNames.onclick=()=>{const n=normalizeNames(el.namesInput.value);if(!n.length)return; appendList(n); el.namesInput.value="";};
+el.resetAll.onclick=()=>{if(confirm("إعادة ضبط؟")) resetAll();};
+
+loadTemp(); render();
+</script>
+</body>
+</html>
