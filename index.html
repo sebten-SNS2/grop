@@ -37,7 +37,7 @@
     <button type="button" id="save" class="primary">حفظ في المتصفح</button>
     <button type="button" id="load">استرجاع الحفظ</button>
     <!-- زر واحد فقط -->
-    <button type="button" id="exportXls" class="primary">تصدير Excel ملوّن</button>
+    <button type="button" id="exportXlsx" class="primary">تصدير Excel ملوّن</button>
     <button type="button" id="clearAllNames" class="danger">مسح كل الأسماء</button>
   </div>
 
@@ -56,6 +56,9 @@
     </div>
     <div class="muted">تلميح: لصق الأسماء من Excel/Google Sheets (عمود واحد) يعمل مباشرة.</div>
   </details>
+
+  <!-- ExcelJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
 
 <script>
 const STORAGE_KEY = "attendance_v1";
@@ -153,7 +156,7 @@ const el = {
   clearMarks: document.getElementById('clearMarks'),
   save: document.getElementById('save'),
   load: document.getElementById('load'),
-  exportXls: document.getElementById('exportXls'),
+  exportXlsx: document.getElementById('exportXlsx'),
   namesInput: document.getElementById('namesInput'),
   replaceNames: document.getElementById('replaceNames'),
   appendNames: document.getElementById('appendNames'),
@@ -208,8 +211,8 @@ function loadFromStorage(){ const raw=localStorage.getItem(STORAGE_KEY); if(!raw
 function saveTemp(){ localStorage.setItem(STORAGE_KEY+"_temp", JSON.stringify(data)); }
 function loadTemp(){ const raw=localStorage.getItem(STORAGE_KEY+"_temp"); if(raw) try{data=JSON.parse(raw);}catch{} }
 
-/* === تصدير Excel ملوّن === */
-function exportXls(){
+/* === تصدير Excel ملوّن بصيغة XLSX === */
+async function exportXlsx(){
   const now = new Date();
   const dateISO = now.toISOString().slice(0,10);
   const localStamp = now.toLocaleString("ar-IQ");
@@ -221,34 +224,72 @@ function exportXls(){
     f==='unset'   ? p.status==null : true
   );
 
-  const rows = filtered.map((p,i)=>{
-    const s = p.status===true ? "حضور" : p.status===false ? "غياب" : "غير محدد";
-    const bg = p.status===true ? "#e8f7e8" : p.status===false ? "#fde8e8" : "#eef2f7";
-    return `<tr style="background:${bg}">
-      <td style="text-align:center">${i+1}</td>
-      <td style="direction:rtl;text-align:right;font-weight:700">${p.name}</td>
-      <td style="text-align:center">${s}</td>
-    </tr>`;
-  }).join("");
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('الحضور', {views:[{rightToLeft:true}]} );
 
-  const html = `<meta charset="UTF-8">
-  <table dir="rtl" style="border-collapse:collapse;font-family:Tahoma, Arial; font-size:14px">
-    <thead>
-      <tr><th colspan="3" style="text-align:right;padding:6px;background:#f3f4f6;border:1px solid #ddd">
-        تاريخ التصدير: ${localStamp} — التصفية: ${f==='present'?"الحضور فقط":f==='absent'?"الغياب فقط":f==='unset'?"غير محدد فقط":"الكل"}
-      </th></tr>
-      <tr style="background:#e5e7eb">
-        <th style="border:1px solid #ddd;padding:6px">#</th>
-        <th style="border:1px solid #ddd;padding:6px">الاسم الكامل</th>
-        <th style="border:1px solid #ddd;padding:6px">الحالة</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  const filterTitle = f==='present' ? "الحضور فقط" :
+                      f==='absent'  ? "الغياب فقط" :
+                      f==='unset'   ? "غير محدد فقط" : "الكل";
 
-  const filename = `سجل-الحضور-${dateISO}.xls`;
+  ws.mergeCells('A1:C1');
+  const headerInfo = ws.getCell('A1');
+  headerInfo.value = `تاريخ التصدير: ${localStamp} — التصفية: ${filterTitle}`;
+  headerInfo.alignment = { horizontal:'right' };
+  headerInfo.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF3F4F6'} };
+  headerInfo.border = { top:{style:'thin',color:{argb:'FFDDDDDD'}},
+                        left:{style:'thin',color:{argb:'FFDDDDDD'}},
+                        bottom:{style:'thin',color:{argb:'FFDDDDDD'}},
+                        right:{style:'thin',color:{argb:'FFDDDDDD'}} };
 
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  ws.addRow(['#','الاسم الكامل','الحالة']);
+  const hdr = ws.getRow(2);
+  hdr.eachCell((c, colNumber)=>{
+    c.font = { bold:true };
+    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE5E7EB'} };
+    c.border = { top:{style:'thin',color:{argb:'FFDDDDDD'}},
+                 left:{style:'thin',color:{argb:'FFDDDDDD'}},
+                 bottom:{style:'thin',color:{argb:'FFDDDDDD'}},
+                 right:{style:'thin',color:{argb:'FFDDDDDD'}} };
+    c.alignment = { horizontal: colNumber===2 ? 'right' : 'center' };
+  });
+
+  ws.columns = [
+    { key:'idx', width:6 },
+    { key:'name', width:40 },
+    { key:'status', width:14 }
+  ];
+
+  const colorPresent = 'FFE8F7E8';  // #e8f7e8
+  const colorAbsent  = 'FFFDE8E8';  // #fde8e8
+  const colorUnset   = 'FFEEF2F7';  // #eef2f7
+
+  filtered.forEach((p,i)=>{
+    const s = p.status===true ? 'حضور' : p.status===false ? 'غياب' : 'غير محدد';
+    const row = ws.addRow([i+1, p.name, s]);
+
+    row.getCell(1).alignment = { horizontal:'center' };
+    row.getCell(2).alignment = { horizontal:'right'  };
+    row.getCell(3).alignment = { horizontal:'center' };
+
+    const fillColor = p.status===true ? colorPresent :
+                      p.status===false ? colorAbsent : colorUnset;
+
+    row.eachCell(c=>{
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:fillColor} };
+      c.border = { top:{style:'thin',color:{argb:'FFDDDDDD'}},
+                   left:{style:'thin',color:{argb:'FFDDDDDD'}},
+                   bottom:{style:'thin',color:{argb:'FFDDDDDD'}},
+                   right:{style:'thin',color:{argb:'FFDDDDDD'}} };
+    });
+    row.getCell(2).font = { bold:true };
+  });
+
+  // تجميد الصفّين الأوّلين (العنوان + رؤوس الأعمدة)
+  ws.views = [{ rightToLeft:true, state:'frozen', ySplit:2 }];
+
+  const filename = `سجل-الحضور-${dateISO}.xlsx`;
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -270,7 +311,8 @@ el.markAllPresent.onclick=()=>{data.forEach(p=>p.status=true);saveTemp();render(
 el.markAllAbsent.onclick=()=>{data.forEach(p=>p.status=false);saveTemp();render();};
 el.clearMarks.onclick=resetAll;
 el.save.onclick=saveToStorage; el.load.onclick=loadFromStorage;
-el.exportXls.onclick=exportXls; el.clearAllNames.onclick=clearAllNames;
+el.exportXlsx.onclick=exportXlsx; // ربط زر التصدير الجديد
+el.clearAllNames.onclick=clearAllNames;
 el.replaceNames.onclick=()=>{const n=normalizeNames(el.namesInput.value);if(!n.length)return; if(!confirm("استبدال؟")) return; replaceList(n); el.namesInput.value="";};
 el.appendNames.onclick=()=>{const n=normalizeNames(el.namesInput.value);if(!n.length)return; appendList(n); el.namesInput.value="";};
 el.resetAll.onclick=()=>{if(confirm("إعادة ضبط؟")) resetAll();};
